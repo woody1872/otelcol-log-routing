@@ -1,0 +1,83 @@
+receivers:
+  filelog/a:
+    include: [./a.log]
+    start_at: beginning
+    include_file_path: true
+    operators:
+      - type: regex_parser
+        regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<sev>[A-Z]*) (?P<msg>.*)$'
+        timestamp:
+          parse_from: attributes.time
+          layout: "%Y-%m-%d %H:%M:%S"
+        severity:
+          parse_from: attributes.sev
+
+  filelog/b:
+    include: [./b.log]
+    start_at: beginning
+    include_file_path: true
+    operators:
+      - type: regex_parser
+        regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<sev>[A-Z]*) (?P<msg>.*)$'
+        timestamp:
+          parse_from: attributes.time
+          layout: "%Y-%m-%d %H:%M:%S"
+        severity:
+          parse_from: attributes.sev
+
+processors:
+  batch:
+
+  groupbyattrs:
+    keys: [log.file.path]
+
+  attributes/gateway:
+    actions:
+      - key: gateway.host
+        action: insert
+        value: ${env:GATEWAY_HOST}
+
+exporters:
+  debug:
+    verbosity: detailed
+
+  file/splunk_hec_a:
+    path: ./splunk_hec_a.log
+
+  file/splunk_hec_b:
+    path: ./splunk_hec_b.log
+
+connectors:
+  routing:
+    error_mode: ignore
+    match_once: true
+    table:
+      - statement: route() where attributes["log.file.path"] == "a.log"
+        pipelines: [logs/splunk_hec_a]
+      - statement: route() where attributes["log.file.path"] == "b.log"
+        pipelines: [logs/splunk_hec_b]
+
+service:
+  pipelines:
+    logs/in:
+      receivers:
+        - filelog/a
+        - filelog/b
+      processors:
+        - attributes/gateway
+        - batch
+        - groupbyattrs
+      exporters:
+        - routing
+
+    logs/splunk_hec_a:
+      receivers:
+        - routing
+      exporters:
+        - file/splunk_hec_a
+
+    logs/splunk_hec_b:
+      receivers:
+        - routing
+      exporters:
+        - file/splunk_hec_b
