@@ -1,19 +1,6 @@
 receivers:
-  filelog/a:
-    include: [./a.log]
-    start_at: beginning
-    include_file_path: true
-    operators:
-      - type: regex_parser
-        regex: '^(?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?P<sev>[A-Z]*) (?P<msg>.*)$'
-        timestamp:
-          parse_from: attributes.time
-          layout: "%Y-%m-%d %H:%M:%S"
-        severity:
-          parse_from: attributes.sev
-
-  filelog/b:
-    include: [./b.log]
+  filelog:
+    include: [./a.log, ./b.log]
     start_at: beginning
     include_file_path: true
     operators:
@@ -58,11 +45,14 @@ connectors:
         pipelines: [logs/splunk_hec_b]
 
 service:
+  # telemetry:
+  #   logs:
+  #     level: debug
+
   pipelines:
     logs/in:
       receivers:
-        - filelog/a
-        - filelog/b
+        - filelog
       processors:
         - attributes/gateway
         - batch
